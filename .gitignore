@@ -150,3 +150,6 @@ vite.config.ts.timestamp-*
 *.db
 *.sqlite
 *.sqlite3
+*.db
+*.sqlite
+*.sqlite3
