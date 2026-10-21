@@ -1,6 +1,7 @@
 const express = require('express');
 const rotasCategorias = require('./rotas/categorias');
 const rotasProdutos = require('./rotas/produtos');
+const rotasEstoque = require('./rotas/estoque');
 const { ErroDeRequisicao } = require('./erros');
 
 // Recebe o banco já aberto. Assim dá pra testar com banco em memória.
@@ -11,6 +12,7 @@ function criarApp(db) {
   app.get('/api/saude', (req, res) => res.json({ ok: true }));
   app.use('/api/categorias', rotasCategorias(db));
   app.use('/api/produtos', rotasProdutos(db));
+  app.use('/api/estoque', rotasEstoque(db));
 
   app.use('/api', (req, res) => {
     res.status(404).json({ erro: 'Rota não encontrada.' });
