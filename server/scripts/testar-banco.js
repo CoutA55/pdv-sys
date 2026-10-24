@@ -148,6 +148,19 @@ deveFalhar('editar uma movimentação de estoque', () => {
   db.prepare('UPDATE movimentacoes_estoque SET quantidade_milesimos = 1 WHERE produto_id = ?').run(produtoId);
 });
 
+const vendaParaDevolucao = db.prepare('SELECT id FROM vendas LIMIT 1').get().id;
+const devolucaoTesteId = randomUUID();
+db.prepare(
+  `INSERT INTO devolucoes_venda (id, venda_id, sessao_id, usuario_id, destino, motivo)
+   VALUES (?, ?, ?, ?, 'ESTOQUE', 'Teste')`
+).run(devolucaoTesteId, vendaParaDevolucao, sessaoId, usuarioId);
+deveFalhar('editar uma devolução registrada', () => {
+  db.prepare('UPDATE devolucoes_venda SET motivo = ? WHERE id = ?').run('alterado', devolucaoTesteId);
+});
+deveFalhar('apagar uma devolução registrada', () => {
+  db.prepare('DELETE FROM devolucoes_venda WHERE id = ?').run(devolucaoTesteId);
+});
+
 deveFalhar('apagar um lançamento de fiado', () => {
   db.prepare('DELETE FROM lancamentos_fiado WHERE cliente_id = ?').run(clienteId);
 });

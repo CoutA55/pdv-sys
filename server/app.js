@@ -2,10 +2,17 @@ const express = require('express');
 const rotasCategorias = require('./rotas/categorias');
 const rotasProdutos = require('./rotas/produtos');
 const rotasEstoque = require('./rotas/estoque');
+const rotasCaixa = require('./rotas/caixa');
+const rotasVendas = require('./rotas/vendas');
+const rotasClientes = require('./rotas/clientes');
+const rotasRelatorios = require('./rotas/relatorios');
+const rotasRelatorioFaturamento = require('./rotas/relatorios-faturamento');
+const rotasUsuarios = require('./rotas/usuarios');
+const rotasBackups = require('./rotas/backups');
 const { ErroDeRequisicao } = require('./erros');
 
 // Recebe o banco já aberto. Assim dá pra testar com banco em memória.
-function criarApp(db) {
+function criarApp(db, gerenciadorBackup = null) {
   const app = express();
   app.use(express.json());
 
@@ -13,6 +20,13 @@ function criarApp(db) {
   app.use('/api/categorias', rotasCategorias(db));
   app.use('/api/produtos', rotasProdutos(db));
   app.use('/api/estoque', rotasEstoque(db));
+  app.use('/api/caixa', rotasCaixa(db));
+  app.use('/api/vendas', rotasVendas(db));
+  app.use('/api/clientes', rotasClientes(db));
+  app.use('/api/relatorios', rotasRelatorios(db));
+  app.use('/api/relatorios', rotasRelatorioFaturamento(db));
+  app.use('/api/usuarios', rotasUsuarios(db));
+  if (gerenciadorBackup) app.use('/api/backups', rotasBackups(gerenciadorBackup));
 
   app.use('/api', (req, res) => {
     res.status(404).json({ erro: 'Rota não encontrada.' });

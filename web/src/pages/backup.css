@@ -1,0 +1,37 @@
+.backup-painel { display: grid; gap: 18px; padding: 22px; }
+.backup-painel h2 { margin: 0; color: var(--ink); font: 800 16px Manrope,sans-serif; }
+.backup-painel p { margin: 7px 0 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.backup-controles { display: grid; grid-template-columns: minmax(180px,1fr) auto; align-items: end; gap: 9px 12px; max-width: 560px; }
+.backup-controles label { grid-column: 1/-1; color: var(--text-secondary); font-size: 11px; font-weight: 700; }
+.backup-controles select { min-width: 0; height: 40px; padding: 0 11px; border: 1px solid var(--line); border-radius: 9px; color: var(--ink); background: var(--surface); font: inherit; }
+.backup-status { display: flex; align-items: center; gap: 9px; color: var(--text-secondary); font-size: 12px; font-weight: 700; }
+.backup-status .status-dot { background: #d68a33; box-shadow: 0 0 0 3px rgba(214,138,51,.13); }
+.backup-status.conectado .status-dot { background: #17bd86; box-shadow: 0 0 0 3px rgba(23,189,134,.13); }
+.backup-rodape { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
+.backup-rodape p { max-width: 650px; margin: 0; }
+.backup-alerta { margin: 0 0 14px; padding: 11px 13px; border: 1px solid; border-radius: 9px; font-size: 12px; }
+.backup-alerta.erro { border-color: #f2c6cb; color: #a53240; background: #fff1f2; }
+.backup-alerta.sucesso { border-color: #bfe8d8; color: #167e61; background: #e8f8f2; }
+.backup-lista { margin-top: 16px; }
+.backup-arquivos { display: grid; }
+.backup-arquivo { display: grid; grid-template-columns: minmax(180px, .8fr) minmax(220px, 1.5fr) auto; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); }
+.backup-arquivo strong { color: var(--ink); font-size: 12px; }
+.backup-arquivo span, .backup-arquivo small, .backup-vazio { color: var(--muted); font-size: 11px; }
+.backup-arquivo small { text-align: right; }
+.backup-vazio { margin: 0; }
+
+.app-shell[data-theme="escuro"] .backup-painel h2,
+.app-shell[data-theme="escuro"] .backup-arquivo strong { color: var(--ink); }
+.app-shell[data-theme="escuro"] .backup-controles select { border-color: var(--line); color: var(--ink); background: #121d2e; }
+.app-shell[data-theme="escuro"] .backup-rodape { border-color: var(--line); }
+.app-shell[data-theme="escuro"] .backup-alerta.erro { border-color: #743947; color: #ffc0c5; background: #3b202c; }
+.app-shell[data-theme="escuro"] .backup-alerta.sucesso { border-color: #28564a; color: #a0edcf; background: #183b36; }
+.app-shell[data-theme="escuro"] .backup-arquivo { border-color: var(--line); }
+
+@media (max-width: 700px) {
+  .backup-controles { grid-template-columns: 1fr; }
+  .backup-controles label { grid-column: auto; }
+  .backup-rodape { align-items: stretch; flex-direction: column; }
+  .backup-arquivo { grid-template-columns: 1fr auto; }
+  .backup-arquivo span { grid-column: 1/-1; grid-row: 2; }
+}

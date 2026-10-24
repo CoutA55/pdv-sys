@@ -21,7 +21,7 @@ module.exports = function rotasEstoque(db) {
   const buscarProdutoAtivo = (id) => {
     const produto =
       typeof id === 'string'
-        ? db.prepare('SELECT id, nome FROM produtos WHERE id = ? AND ativo = 1').get(id)
+        ? db.prepare('SELECT id, nome, unidade FROM produtos WHERE id = ? AND ativo = 1').get(id)
         : undefined;
     if (!produto) throw new ErroDeRequisicao(404, 'Produto não encontrado.');
     return produto;
@@ -30,6 +30,57 @@ module.exports = function rotasEstoque(db) {
   const saldoDe = (produtoId) =>
     db.prepare('SELECT quantidade_milesimos AS q FROM estoque_atual WHERE produto_id = ?').get(produtoId).q;
 
+  router.get('/resumo', (req, res) => {
+    const configuracao = db
+      .prepare("SELECT valor FROM configuracoes WHERE chave = 'estoque_minimo_padrao_milesimos'")
+      .get();
+    const padrao = Number.parseInt(configuracao?.valor, 10) || 0;
+    const produtos = db.prepare(
+      `SELECT p.id, p.unidade, p.preco_custo_centavos, p.preco_venda_centavos,
+              p.estoque_minimo_milesimos, e.quantidade_milesimos,
+              CASE WHEN p.estoque_minimo_milesimos > 0
+                   THEN p.estoque_minimo_milesimos ELSE ? END AS minimo_milesimos
+         FROM produtos p
+         JOIN estoque_atual e ON e.produto_id = p.id
+        WHERE p.ativo = 1`
+    ).all(padrao);
+
+    let valorCusto = 0n;
+    let faturamentoPotencial = 0n;
+    let estoqueBaixo = 0;
+    const unidades = new Set();
+    for (const produto of produtos) {
+      const quantidade = BigInt(produto.quantidade_milesimos);
+      valorCusto += (quantidade * BigInt(produto.preco_custo_centavos) + 500n) / 1000n;
+      faturamentoPotencial += (quantidade * BigInt(produto.preco_venda_centavos) + 500n) / 1000n;
+      if (produto.quantidade_milesimos <= produto.minimo_milesimos) estoqueBaixo++;
+      unidades.add(produto.unidade);
+    }
+
+    const lucroPotencial = faturamentoPotencial - valorCusto;
+    const seguro = (valor, campo) => {
+      if (valor > BigInt(Number.MAX_SAFE_INTEGER) || valor < BigInt(Number.MIN_SAFE_INTEGER)) {
+        throw new ErroDeRequisicao(500, `O total de ${campo} excede o limite seguro.`);
+      }
+      return Number(valor);
+    };
+    const custoCentavos = seguro(valorCusto, 'estoque a custo');
+    const faturamentoCentavos = seguro(faturamentoPotencial, 'faturamento potencial');
+    const lucroCentavos = seguro(lucroPotencial, 'lucro bruto potencial');
+
+    res.json({
+      produtos_ativos: produtos.length,
+      produtos_baixo_estoque: estoqueBaixo,
+      unidades_produto: unidades.size,
+      valor_estoque_custo_centavos: custoCentavos,
+      faturamento_potencial_centavos: faturamentoCentavos,
+      lucro_bruto_potencial_centavos: lucroCentavos,
+      margem_bruta_potencial_percentual: faturamentoCentavos > 0
+        ? Math.round((lucroCentavos / faturamentoCentavos) * 10000) / 100
+        : 0,
+    });
+  });
+
   // POST /api/estoque/entrada
   // { produto_id, quantidade_milesimos, custo_unitario_centavos?, observacao?, atualizar_custo_produto? }
   // Compra de mercadoria. 24 unidades = 24000.
@@ -37,6 +88,9 @@ module.exports = function rotasEstoque(db) {
     const corpo = req.body ?? {};
     const produto = buscarProdutoAtivo(corpo.produto_id);
     const quantidade = inteiroPositivo(corpo.quantidade_milesimos, 'quantidade_milesimos');
+    if (produto.unidade === 'UN' && quantidade % 1000 !== 0) {
+      throw new ErroDeRequisicao(400, 'A quantidade de produtos vendidos por unidade deve ser inteira.');
+    }
     const observacao = textoOpcional(corpo.observacao);
 
     let custo = null;
@@ -117,6 +171,12 @@ module.exports = function rotasEstoque(db) {
           throw new ErroDeRequisicao(400, 'A contagem é igual ao saldo atual: nada a ajustar.');
         }
       }
+      if (produto.unidade === 'UN' && diferenca % 1000 !== 0) {
+        throw new ErroDeRequisicao(400, 'O ajuste de produtos vendidos por unidade deve ser inteiro.');
+      }
+      if (saldoDe(produto.id) + diferenca < 0) {
+        throw new ErroDeRequisicao(409, 'O ajuste não pode deixar o estoque abaixo de zero.');
+      }
 
       db.prepare(
         `INSERT INTO movimentacoes_estoque
@@ -151,13 +211,25 @@ module.exports = function rotasEstoque(db) {
 
     const movimentacoes = db
       .prepare(
-        `SELECT m.id, m.produto_id, p.nome AS produto_nome, m.tipo,
-                m.quantidade_milesimos, m.custo_unitario_centavos,
-                m.venda_id, m.observacao, m.criado_em
-           FROM movimentacoes_estoque m
-           JOIN produtos p ON p.id = m.produto_id
+        `WITH movimentos AS (
+           SELECT m.id, m.rowid, m.produto_id, p.nome AS produto_nome, p.unidade,
+                  m.tipo, m.quantidade_milesimos, m.custo_unitario_centavos,
+                  m.venda_id, m.usuario_id, u.nome AS usuario_nome,
+                  m.observacao, m.criado_em,
+                  SUM(m.quantidade_milesimos) OVER (
+                    PARTITION BY m.produto_id ORDER BY m.criado_em, m.rowid
+                    ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+                  ) AS saldo_apos_milesimos
+             FROM movimentacoes_estoque m
+             JOIN produtos p ON p.id = m.produto_id
+             LEFT JOIN usuarios u ON u.id = m.usuario_id
            ${where}
-          ORDER BY m.criado_em DESC, m.rowid DESC
+         )
+         SELECT id, produto_id, produto_nome, unidade, tipo, quantidade_milesimos,
+                custo_unitario_centavos, venda_id, usuario_id, usuario_nome,
+                observacao, criado_em, saldo_apos_milesimos
+           FROM movimentos
+          ORDER BY criado_em DESC, rowid DESC
           LIMIT ?`
       )
       .all(...parametros, limite);
